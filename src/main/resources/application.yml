@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: compensation-commerce
+  datasource:
+    url: jdbc:mysql://localhost:3406/commerce?characterEncoding=UTF-8
+    username: commerce
+    password: commerce
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+  mvc:
+    problemdetails:
+      enabled: true
