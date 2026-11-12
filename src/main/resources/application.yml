@@ -5,6 +5,9 @@ spring:
     url: jdbc:mysql://localhost:3406/commerce?characterEncoding=UTF-8
     username: commerce
     password: commerce
+  sql:
+    init:
+      mode: always
   jpa:
     hibernate:
       ddl-auto: validate
