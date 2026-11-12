@@ -18,3 +18,7 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+
+commerce:
+  order:
+    payment-window: PT15M
