@@ -16,7 +16,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @TestPropertySource(properties = {
         "spring.datasource.hikari.maximum-pool-size=5",
@@ -30,14 +29,14 @@ class ConnectionPoolTest extends IntegrationTestSupport {
     private OrderPlacementFacade placementFacade;
 
     @Autowired
-    private PaymentConfirmService paymentConfirm;
+    private OrderPaymentSaga paymentConfirm;
 
     @Autowired
     private OrderQueryService orderQueryService;
 
     @Test
-    @DisplayName("[문제 재현] PG가 2초 지연되면 동시 결제 20건 중 15건이 커넥션을 얻지 못해 실패한다")
-    void poolExhaustion() throws InterruptedException {
+    @DisplayName("PG가 2초 지연돼도 동시 결제 20건이 커넥션 5개로 모두 성공한다")
+    void noPoolExhaustion() throws InterruptedException {
         Long memberId = fixtures.member();
         List<PlaceOrderResult> orders = new ArrayList<>();
         for (int i = 0; i < REQUESTS; i++) {
@@ -71,16 +70,15 @@ class ConnectionPoolTest extends IntegrationTestSupport {
         start.countDown();
 
         Thread.sleep(300);
-        String anyOrderNo = orders.get(0).getOrderNo();
-        assertThatThrownBy(() -> orderQueryService.getOrder(memberId, anyOrderNo))
-                .isInstanceOf(RuntimeException.class);
+        OrderDetail detail = orderQueryService.getOrder(memberId, orders.get(0).getOrderNo());
+        assertThat(detail.getOrderNo()).isEqualTo(orders.get(0).getOrderNo());
 
         boolean finished = done.await(30, TimeUnit.SECONDS);
         pool.shutdown();
 
         assertThat(finished).isTrue();
-        assertThat(succeeded.get()).isEqualTo(5);
-        assertThat(failed.get()).isEqualTo(15);
+        assertThat(succeeded.get()).isEqualTo(20);
+        assertThat(failed.get()).isEqualTo(0);
     }
 
 }
