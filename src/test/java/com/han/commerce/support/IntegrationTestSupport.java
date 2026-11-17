@@ -21,10 +21,14 @@ public abstract class IntegrationTestSupport {
     @Autowired
     protected MutableClockHolder clock;
 
+    @Autowired
+    protected FakePaymentGateway paymentGateway;
+
     @BeforeEach
     void resetState() {
         databaseCleaner.clean();
         clock.reset();
+        paymentGateway.reset();
     }
 
 }
