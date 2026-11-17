@@ -22,3 +22,5 @@ spring:
 commerce:
   order:
     payment-window: PT15M
+  pg:
+    stub-delay-ms: 0

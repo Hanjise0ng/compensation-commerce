@@ -5,6 +5,7 @@ import com.han.commerce.common.domain.Money;
 import com.han.commerce.coupon.domain.MemberCouponStatus;
 import com.han.commerce.coupon.infrastructure.MemberCouponJpaRepository;
 import com.han.commerce.order.domain.Order;
+import com.han.commerce.order.domain.OrderStatus;
 import com.han.commerce.order.infrastructure.OrderJpaRepository;
 import com.han.commerce.payment.domain.Payment;
 import com.han.commerce.payment.domain.PaymentStatus;
@@ -54,7 +55,7 @@ class OrderPlacementTest extends IntegrationTestSupport {
         PlaceOrderResult result = placementFacade.place(new PlaceOrderCommand(memberId, "key-1",
                 List.of(new PlaceOrderCommand.Item(product.getId(), 2)), memberCouponId, 2_000));
 
-        assertThat(result.getStatus()).isEqualTo("PENDING");
+        assertThat(result.getStatus()).isEqualTo(OrderStatus.PENDING);
         assertThat(result.getPayAmount()).isEqualTo(15_000L);
         assertThat(result.getExpiresAt()).isEqualTo(clock.now().plusMinutes(15));
 

@@ -25,7 +25,7 @@ Java 21 · Spring Boot 4.1 · Spring Data JPA · MySQL 8.4 · Testcontainers · 
 | 0 | 프로젝트 뼈대, CI | 완료 |
 | 1 | 도메인 모델과 단위 테스트 | 완료 |
 | 2 | 주문 생성, 중복 요청 방지, 주문 만료 | 완료 |
-| 3 | 결제 승인을 트랜잭션 하나로 구현하고 한계 측정 | 예정 |
+| 3 | 결제 승인을 트랜잭션 하나로 구현하고 한계 측정 | 완료 |
 | 4 | 트랜잭션 분리 | 예정 |
 | 5 | 결제 거절 시 보상 | 예정 |
 
@@ -35,6 +35,7 @@ Java 21 · Spring Boot 4.1 · Spring Data JPA · MySQL 8.4 · Testcontainers · 
 | --- | --- | --- |
 | POST | `/api/orders` | 주문 생성. `Idempotency-Key` 헤더 필수 |
 | GET | `/api/orders/{orderNo}` | 주문 조회 |
+| POST | `/api/payments/confirm` | 결제 승인. 주문번호·결제 키·금액을 받아 PG에 승인을 요청하고 주문을 확정 |
 
 ## 검증한 것
 
@@ -45,6 +46,9 @@ Java 21 · Spring Boot 4.1 · Spring Data JPA · MySQL 8.4 · Testcontainers · 
 | 재고가 부족한 주문 | 쿠폰·포인트 사용도 함께 취소 | `OrderPlacementTest` |
 | 같은 키로 주문을 두 번 요청 | 주문 1건 | `OrderPlacementTest` |
 | 결제 기한이 지난 주문 | 만료되고 재고·쿠폰·포인트 반환 | `OrderExpirationTest` |
+| 결제 승인 성공 | 주문 완료, 예약 재고가 실제 차감으로 확정 | `OrderPaymentTest` |
+| 클라이언트가 보낸 금액이 주문 금액과 다름 | PG를 호출하지 않고 거절 | `OrderPaymentTest` |
+| **[문제 재현]** 커넥션 풀 5개, PG 응답 2초 지연, 동시 결제 20건 | [직접 측정]건 성공, [직접 측정]건 실패. 같은 시각 주문 조회도 실패 | `ConnectionPoolTest` |
 
 ## 설계 결정
 
@@ -62,6 +66,8 @@ Java 21 · Spring Boot 4.1 · Spring Data JPA · MySQL 8.4 · Testcontainers · 
 - 주문 서비스가 재고·쿠폰·포인트 리포지토리를 직접 다룬다. 리팩터링 단계에서 도메인별 서비스로 나눈다.
 - 주문번호가 겹치면 그 요청은 500으로 실패한다. 재요청하면 성공한다.
 - 인증은 `X-Member-Id` 헤더를 그대로 믿는 개발용 방식이다.
+- 결제 승인 전체가 트랜잭션 하나라서, PG를 기다리는 동안 DB 커넥션을 쥐고 있다. PG가 느려지면 결제와 무관한 조회까지 실패한다(위 `ConnectionPoolTest`). 다음 단계에서 트랜잭션을 나눈다.
+- PG가 승인한 뒤 커밋 전에 예외가 나면, 돈은 나갔는데 주문 기록은 롤백된다. 추후 단계에서 다룬다.
 
 ## 실행
 

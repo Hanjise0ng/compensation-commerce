@@ -33,6 +33,7 @@ public enum ErrorCode {
 
     PAYMENT_NOT_FOUND(ErrorType.NOT_FOUND, "결제 정보를 찾을 수 없습니다."),
     PAYMENT_AMOUNT_MISMATCH(ErrorType.CONFLICT, "결제 금액이 주문 금액과 다릅니다."),
+    PAYMENT_DECLINED(ErrorType.CONFLICT, "결제가 거절되었습니다."),
     INVALID_PAYMENT_STATE(ErrorType.CONFLICT, "현재 결제 상태에서는 처리할 수 없습니다.");
 
     private final ErrorType type;

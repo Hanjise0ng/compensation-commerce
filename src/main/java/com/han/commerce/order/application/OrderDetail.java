@@ -2,13 +2,15 @@ package com.han.commerce.order.application;
 
 import com.han.commerce.order.domain.Order;
 import com.han.commerce.order.domain.OrderItem;
+import com.han.commerce.order.domain.OrderStatus;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
 public class OrderDetail {
 
     private final String orderNo;
-    private final String status;
+    private final OrderStatus status;
     private final long totalAmount;
     private final long discountAmount;
     private final long pointAmount;
@@ -19,7 +21,7 @@ public class OrderDetail {
 
     private OrderDetail(Order order) {
         this.orderNo = order.getOrderNo();
-        this.status = order.getStatus().name();
+        this.status = order.getStatus();
         this.totalAmount = order.getTotalAmount().getAmount();
         this.discountAmount = order.getDiscountAmount().getAmount();
         this.pointAmount = order.getPointAmount().getAmount();
@@ -37,7 +39,7 @@ public class OrderDetail {
         return orderNo;
     }
 
-    public String getStatus() {
+    public OrderStatus getStatus() {
         return status;
     }
 
