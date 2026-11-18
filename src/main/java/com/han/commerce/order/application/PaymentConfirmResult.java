@@ -16,6 +16,14 @@ public class PaymentConfirmResult {
         return new PaymentConfirmResult(orderNo, PaymentConfirmStatus.PAID, null);
     }
 
+    public static PaymentConfirmResult failed(String orderNo, String message) {
+        return new PaymentConfirmResult(orderNo, PaymentConfirmStatus.FAILED, message);
+    }
+
+    public static PaymentConfirmResult pending(String orderNo, String message) {
+        return new PaymentConfirmResult(orderNo, PaymentConfirmStatus.PENDING, message);
+    }
+
     public String getOrderNo() {
         return orderNo;
     }

@@ -22,7 +22,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.time.Duration;
 import java.util.List;
 
 import static com.han.commerce.support.DomainAssertions.assertErrorCode;
@@ -126,24 +125,52 @@ class OrderPaymentTest extends IntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("[문제 재현] PG가 거절하면 재고 예약, 쿠폰, 포인트가 영원히 돌아오지 않는다")
-    void declinedLeavesResourcesStuck() {
+    @DisplayName("PG가 거절하면 주문은 FAILED가 되고 재고 예약, 쿠폰, 포인트가 돌아온다")
+    void declinedIsCompensated() {
         PlaceOrderResult placed = placeOrder();
         paymentGateway.willDecline("REJECT_CARD_COMPANY", "한도 초과");
 
-        assertErrorCode(() -> paymentConfirm.confirm(confirmCommand(placed)), ErrorCode.PAYMENT_DECLINED);
+        PaymentConfirmResult result = paymentConfirm.confirm(confirmCommand(placed));
+
+        assertThat(result.getStatus()).isEqualTo(PaymentConfirmStatus.FAILED);
+        assertThat(result.getMessage()).isEqualTo("한도 초과");
+
+        Order order = findOrder(placed);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
+        Payment payment = paymentRepository.findByOrderId(order.getId()).orElseThrow();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(payment.getFailureCode()).isEqualTo("REJECT_CARD_COMPANY");
+
+        assertThat(findStock().getOnHand()).isEqualTo(10);
+        assertThat(findStock().getReserved()).isEqualTo(0);
+        assertThat(stockHistoryRepository.countByOrderIdAndType(order.getId(), StockHistoryType.RELEASE))
+                .isEqualTo(1L);
+        assertThat(memberCouponRepository.findById(memberCouponId).orElseThrow().getStatus())
+                .isEqualTo(MemberCouponStatus.AVAILABLE);
+        assertThat(pointWalletRepository.findByMemberId(memberId).orElseThrow().getBalance())
+                .isEqualTo(Money.of(5_000));
+        assertThat(pointHistoryRepository.count()).isEqualTo(3L);
+    }
+
+    @Test
+    @DisplayName("PG 응답을 받지 못하면 아무것도 되돌리지 않고 결제 대기 상태로 둔다")
+    void unknownIsNotCompensated() {
+        PlaceOrderResult placed = placeOrder();
+        paymentGateway.willTimeout();
+
+        PaymentConfirmResult result = paymentConfirm.confirm(confirmCommand(placed));
+
+        assertThat(result.getStatus()).isEqualTo(PaymentConfirmStatus.PENDING);
 
         Order order = findOrder(placed);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
-        assertThat(order.getExpiresAt()).isNull();
+        assertThat(paymentRepository.findByOrderId(order.getId()).orElseThrow().getStatus())
+                .isEqualTo(PaymentStatus.READY);
         assertThat(findStock().getReserved()).isEqualTo(2);
         assertThat(memberCouponRepository.findById(memberCouponId).orElseThrow().getStatus())
                 .isEqualTo(MemberCouponStatus.USED);
         assertThat(pointWalletRepository.findByMemberId(memberId).orElseThrow().getBalance())
                 .isEqualTo(Money.of(3_000));
-
-        clock.advance(Duration.ofHours(24));
-        assertThat(expirationService.findExpiredOrderIds(50)).isEmpty();
     }
 
 }

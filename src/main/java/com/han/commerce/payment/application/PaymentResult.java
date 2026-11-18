@@ -1,4 +1,4 @@
 package com.han.commerce.payment.application;
 
-public sealed interface PaymentResult permits Approved, Declined {
+public sealed interface PaymentResult permits Approved, Declined, Unknown {
 }

@@ -18,10 +18,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeSet;
 
-/**
- * 결제 대기 주문이 선점한 자원(재고 예약, 쿠폰, 포인트)을 되돌린다.
- * 호출하는 쪽의 트랜잭션 안에서 실행된다.
- */
 @Component
 public class OrderResourceReleaser {
 

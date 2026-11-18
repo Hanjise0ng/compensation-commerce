@@ -29,6 +29,10 @@ public class FakePaymentGateway implements PaymentGateway {
         this.scripted = new Declined(code, message);
     }
 
+    public void willTimeout() {
+        this.scripted = new Unknown("read timeout");
+    }
+
     public void delay(long delayMs) {
         this.delayMs = delayMs;
     }

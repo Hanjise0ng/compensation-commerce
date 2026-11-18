@@ -4,7 +4,10 @@ import com.han.commerce.auth.AuthenticatedMember;
 import com.han.commerce.auth.LoginMember;
 import com.han.commerce.order.application.OrderPaymentSaga;
 import com.han.commerce.order.application.PaymentConfirmResult;
+import com.han.commerce.order.application.PaymentConfirmStatus;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,9 +24,11 @@ public class PaymentController {
     }
 
     @PostMapping("/confirm")
-    public PaymentConfirmResult confirm(@LoginMember AuthenticatedMember member,
-                                        @Valid @RequestBody ConfirmPaymentRequest request) {
-        return orderPaymentSaga.confirm(request.toCommand(member.getMemberId()));
+    public ResponseEntity<PaymentConfirmResult> confirm(@LoginMember AuthenticatedMember member,
+                                                        @Valid @RequestBody ConfirmPaymentRequest request) {
+        PaymentConfirmResult result = orderPaymentSaga.confirm(request.toCommand(member.getMemberId()));
+        HttpStatus status = result.getStatus() == PaymentConfirmStatus.PENDING ? HttpStatus.ACCEPTED : HttpStatus.OK;
+        return ResponseEntity.status(status).body(result);
     }
 
 }
