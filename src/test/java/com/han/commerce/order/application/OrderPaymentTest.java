@@ -22,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.Duration;
 import java.util.List;
 
 import static com.han.commerce.support.DomainAssertions.assertErrorCode;
@@ -33,7 +34,10 @@ class OrderPaymentTest extends IntegrationTestSupport {
     private OrderPlacementFacade placementFacade;
 
     @Autowired
-    private PaymentConfirmService paymentConfirm;
+    private OrderPaymentSaga paymentConfirm;
+
+    @Autowired
+    private OrderExpirationService expirationService;
 
     @Autowired
     private OrderJpaRepository orderRepository;
@@ -122,8 +126,8 @@ class OrderPaymentTest extends IntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("[단일 트랜잭션] PG가 거절하면 롤백되어 주문은 결제 대기 상태로 돌아간다")
-    void declined() {
+    @DisplayName("[문제 재현] PG가 거절하면 재고 예약, 쿠폰, 포인트가 영원히 돌아오지 않는다")
+    void declinedLeavesResourcesStuck() {
         PlaceOrderResult placed = placeOrder();
         paymentGateway.willDecline("REJECT_CARD_COMPANY", "한도 초과");
 
@@ -131,9 +135,15 @@ class OrderPaymentTest extends IntegrationTestSupport {
 
         Order order = findOrder(placed);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
-        assertThat(order.getExpiresAt()).isNotNull();
-        assertThat(paymentRepository.findByOrderId(order.getId()).orElseThrow().getPaymentKey()).isNull();
+        assertThat(order.getExpiresAt()).isNull();
         assertThat(findStock().getReserved()).isEqualTo(2);
+        assertThat(memberCouponRepository.findById(memberCouponId).orElseThrow().getStatus())
+                .isEqualTo(MemberCouponStatus.USED);
+        assertThat(pointWalletRepository.findByMemberId(memberId).orElseThrow().getBalance())
+                .isEqualTo(Money.of(3_000));
+
+        clock.advance(Duration.ofHours(24));
+        assertThat(expirationService.findExpiredOrderIds(50)).isEmpty();
     }
 
 }
