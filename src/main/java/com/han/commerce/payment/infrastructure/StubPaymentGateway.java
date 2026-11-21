@@ -1,10 +1,7 @@
 package com.han.commerce.payment.infrastructure;
 
 import com.han.commerce.common.application.ClockHolder;
-import com.han.commerce.payment.application.Approved;
-import com.han.commerce.payment.application.PaymentConfirmRequest;
-import com.han.commerce.payment.application.PaymentGateway;
-import com.han.commerce.payment.application.PaymentResult;
+import com.han.commerce.payment.application.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -23,6 +20,11 @@ public class StubPaymentGateway implements PaymentGateway {
     @Override
     public PaymentResult confirm(PaymentConfirmRequest request) {
         sleep();
+        return new Approved(request.getPaymentKey(), request.getAmount(), "CARD", clockHolder.now());
+    }
+
+    @Override
+    public PaymentResult inquire(PaymentInquiryRequest request) {
         return new Approved(request.getPaymentKey(), request.getAmount(), "CARD", clockHolder.now());
     }
 
