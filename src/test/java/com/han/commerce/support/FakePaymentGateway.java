@@ -13,8 +13,9 @@ public class FakePaymentGateway implements PaymentGateway {
 
     private final ClockHolder clockHolder;
     private final AtomicInteger callCount = new AtomicInteger();
-
+    private final AtomicInteger inquiryCount = new AtomicInteger();
     private volatile PaymentResult scripted;
+    private volatile PaymentResult inquiryScripted;
     private volatile long delayMs;
 
     public FakePaymentGateway(ClockHolder clockHolder) {
@@ -33,18 +34,36 @@ public class FakePaymentGateway implements PaymentGateway {
         this.scripted = new Unknown("read timeout");
     }
 
+    public void inquiryWillFindApproved() {
+        this.inquiryScripted = null;
+    }
+
+    public void inquiryWillFindNothing() {
+        this.inquiryScripted = new Declined("PAYMENT_NOT_FOUND", "PG에 결제 기록이 없습니다.");
+    }
+
+    public void inquiryWillTimeout() {
+        this.inquiryScripted = new Unknown("inquiry timeout");
+    }
+
     public void delay(long delayMs) {
         this.delayMs = delayMs;
     }
 
     public void reset() {
         this.scripted = null;
+        this.inquiryScripted = null;
         this.delayMs = 0;
         this.callCount.set(0);
+        this.inquiryCount.set(0);
     }
 
     public int callCount() {
         return callCount.get();
+    }
+
+    public int inquiryCount() {
+        return inquiryCount.get();
     }
 
     @Override
@@ -53,6 +72,15 @@ public class FakePaymentGateway implements PaymentGateway {
         sleep();
         if (scripted != null) {
             return scripted;
+        }
+        return new Approved(request.getPaymentKey(), request.getAmount(), "CARD", clockHolder.now());
+    }
+
+    @Override
+    public PaymentResult inquire(PaymentInquiryRequest request) {
+        inquiryCount.incrementAndGet();
+        if (inquiryScripted != null) {
+            return inquiryScripted;
         }
         return new Approved(request.getPaymentKey(), request.getAmount(), "CARD", clockHolder.now());
     }
