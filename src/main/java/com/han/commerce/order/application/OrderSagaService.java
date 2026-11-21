@@ -10,6 +10,7 @@ import com.han.commerce.order.domain.OrderSagaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,6 +48,21 @@ public class OrderSagaService {
                 .orElseThrow(() -> new DomainException(ErrorCode.ORDER_NOT_FOUND));
         return Optional.of(new RecoveryTarget(saga.getId(), order.getId(), order.getOrderNo(),
                 saga.getPaymentKey(), order.getPayAmount()));
+    }
+
+    @Transactional
+    public RecoveryOutcome recordCancelFailure(Long sagaId, String reason) {
+        OrderSaga saga = sagaRepository.findById(sagaId)
+                .orElseThrow(() -> new DomainException(ErrorCode.SAGA_NOT_FOUND));
+        LocalDateTime now = clockHolder.now();
+        int attempt = saga.getAttemptCount() + 1;
+
+        if (recoveryPolicy.isCancelExhausted(attempt)) {
+            saga.giveUp(reason, now);
+            return RecoveryOutcome.CANCEL_GAVE_UP;
+        }
+        saga.postpone(reason, now.plus(recoveryPolicy.cancelRetryDelay(attempt)));
+        return RecoveryOutcome.CANCEL_POSTPONED;
     }
 
     @Transactional

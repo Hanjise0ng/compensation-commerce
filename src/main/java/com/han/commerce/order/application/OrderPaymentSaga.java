@@ -45,7 +45,7 @@ public class OrderPaymentSaga {
             case CONFIRMED -> PaymentConfirmResult.paid(attempt.getOrderNo());
             case CANCELED -> PaymentConfirmResult.failed(attempt.getOrderNo(),
                     "주문을 완료하지 못해 결제를 취소했습니다.");
-            case CANCEL_POSTPONED -> PaymentConfirmResult.pending(attempt.getOrderNo(),
+            case CANCEL_POSTPONED, CANCEL_GAVE_UP -> PaymentConfirmResult.pending(attempt.getOrderNo(),
                     "주문을 완료하지 못해 결제 취소를 진행하고 있습니다.");
             default -> PaymentConfirmResult.pending(attempt.getOrderNo(), "결제 결과를 확인하고 있습니다.");
         };

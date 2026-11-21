@@ -76,6 +76,13 @@ public class OrderSaga extends BaseEntity {
         this.nextCheckAt = nextCheckAt;
     }
 
+    public void giveUp(String reason, LocalDateTime now) {
+        requireStatus(SagaStatus.COMPENSATING);
+        this.attemptCount++;
+        this.lastError = truncate(reason);
+        finish(SagaStatus.COMPENSATION_FAILED, now);
+    }
+
     public boolean isInProgress() {
         return status == SagaStatus.STARTED;
     }

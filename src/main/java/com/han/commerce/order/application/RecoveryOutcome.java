@@ -6,5 +6,6 @@ public enum RecoveryOutcome {
     POSTPONED,
     SKIPPED,
     CANCELED,
-    CANCEL_POSTPONED
+    CANCEL_POSTPONED,
+    CANCEL_GAVE_UP
 }

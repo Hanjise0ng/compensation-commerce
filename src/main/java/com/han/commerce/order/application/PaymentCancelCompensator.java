@@ -40,10 +40,7 @@ public class PaymentCancelCompensator {
                 compensationService.compensateCanceled(target.getOrderId(), canceled.getCanceledAt());
                 yield RecoveryOutcome.CANCELED;
             }
-            case CancelFailed failed -> {
-                sagaService.postpone(sagaId, failed.getReason());
-                yield RecoveryOutcome.CANCEL_POSTPONED;
-            }
+            case CancelFailed failed -> sagaService.recordCancelFailure(sagaId, failed.getReason());
         };
     }
 
