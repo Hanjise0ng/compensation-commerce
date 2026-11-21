@@ -1,6 +1,7 @@
 package com.han.commerce.support;
 
 import com.han.commerce.common.application.ClockHolder;
+import com.han.commerce.common.domain.Money;
 import com.han.commerce.payment.application.*;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
@@ -32,6 +33,10 @@ public class FakePaymentGateway implements PaymentGateway {
 
     public void willTimeout() {
         this.scripted = new Unknown("read timeout");
+    }
+
+    public void willApproveAmount(long amount) {
+        this.scripted = new Approved("pay-key-1", Money.of(amount), "CARD", clockHolder.now());
     }
 
     public void inquiryWillFindApproved() {
