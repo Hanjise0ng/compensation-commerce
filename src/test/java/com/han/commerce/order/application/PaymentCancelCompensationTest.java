@@ -1,6 +1,8 @@
 package com.han.commerce.order.application;
 
-import com.han.commerce.common.domain.ErrorCode;
+import com.han.commerce.common.domain.Money;
+import com.han.commerce.coupon.domain.MemberCouponStatus;
+import com.han.commerce.coupon.infrastructure.MemberCouponJpaRepository;
 import com.han.commerce.order.domain.Order;
 import com.han.commerce.order.domain.OrderSaga;
 import com.han.commerce.order.domain.OrderStatus;
@@ -8,7 +10,11 @@ import com.han.commerce.order.domain.SagaStatus;
 import com.han.commerce.order.infrastructure.OrderJpaRepository;
 import com.han.commerce.order.infrastructure.OrderSagaJpaRepository;
 import com.han.commerce.payment.domain.PaymentStatus;
+import com.han.commerce.payment.domain.Refund;
+import com.han.commerce.payment.domain.RefundStatus;
 import com.han.commerce.payment.infrastructure.PaymentJpaRepository;
+import com.han.commerce.payment.infrastructure.RefundJpaRepository;
+import com.han.commerce.point.infrastructure.PointWalletJpaRepository;
 import com.han.commerce.product.domain.Product;
 import com.han.commerce.stock.domain.Stock;
 import com.han.commerce.stock.infrastructure.StockJpaRepository;
@@ -17,9 +23,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.Duration;
 import java.util.List;
 
-import static com.han.commerce.support.DomainAssertions.assertErrorCode;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PaymentCancelCompensationTest extends IntegrationTestSupport {
@@ -31,6 +37,9 @@ class PaymentCancelCompensationTest extends IntegrationTestSupport {
     private OrderPaymentSaga paymentConfirm;
 
     @Autowired
+    private PaymentRecoveryService recoveryService;
+
+    @Autowired
     private OrderJpaRepository orderRepository;
 
     @Autowired
@@ -40,7 +49,16 @@ class PaymentCancelCompensationTest extends IntegrationTestSupport {
     private PaymentJpaRepository paymentRepository;
 
     @Autowired
+    private RefundJpaRepository refundRepository;
+
+    @Autowired
     private StockJpaRepository stockRepository;
+
+    @Autowired
+    private MemberCouponJpaRepository memberCouponRepository;
+
+    @Autowired
+    private PointWalletJpaRepository pointWalletRepository;
 
     private Long memberId;
     private Product product;
@@ -67,25 +85,95 @@ class PaymentCancelCompensationTest extends IntegrationTestSupport {
         return sagaRepository.findByOrderId(findOrder(placed).getId()).orElseThrow();
     }
 
+    private Refund findRefund(PlaceOrderResult placed) {
+        return refundRepository.findByOrderId(findOrder(placed).getId()).orElseThrow();
+    }
+
+    private PaymentStatus paymentStatus(PlaceOrderResult placed) {
+        return paymentRepository.findByOrderId(findOrder(placed).getId()).orElseThrow().getStatus();
+    }
+
     private Stock findStock() {
         return stockRepository.findByProductId(product.getId()).orElseThrow();
     }
 
     @Test
-    @DisplayName("[문제 재현] PG는 승인했는데 주문 확정이 실패하면 결제만 남는다")
-    void approvedButConfirmFails() {
+    @DisplayName("PG는 승인했는데 주문 확정이 실패하면 결제를 취소하고 자원을 돌려준다")
+    void cancelsPaymentWhenConfirmFails() {
+        PlaceOrderResult placed = placeOrder();
+        long approvedAmount = placed.getPayAmount() - 1_000;
+        paymentGateway.willApproveAmount(approvedAmount);
+
+        PaymentConfirmResult result = paymentConfirm.confirm(confirmCommand(placed));
+
+        assertThat(result.getStatus()).isEqualTo(PaymentConfirmStatus.FAILED);
+        assertThat(paymentGateway.cancelCount()).isEqualTo(1);
+        assertThat(paymentGateway.lastCanceledAmount()).isEqualTo(Money.of(approvedAmount));
+
+        assertThat(findOrder(placed).getStatus()).isEqualTo(OrderStatus.FAILED);
+        assertThat(paymentStatus(placed)).isEqualTo(PaymentStatus.CANCELED);
+        Refund refund = findRefund(placed);
+        assertThat(refund.getStatus()).isEqualTo(RefundStatus.COMPLETED);
+        assertThat(refund.getAmount()).isEqualTo(Money.of(approvedAmount));
+
+        assertThat(findStock().getOnHand()).isEqualTo(10);
+        assertThat(findStock().getReserved()).isEqualTo(0);
+        assertThat(memberCouponRepository.findById(memberCouponId).orElseThrow().getStatus())
+                .isEqualTo(MemberCouponStatus.AVAILABLE);
+        assertThat(pointWalletRepository.findByMemberId(memberId).orElseThrow().getBalance())
+                .isEqualTo(Money.of(5_000));
+        assertThat(findSaga(placed).getStatus()).isEqualTo(SagaStatus.COMPENSATED);
+    }
+
+    @Test
+    @DisplayName("복구 워커가 승인을 확인했지만 확정할 수 없으면 워커가 결제를 취소한다")
+    void recoveryCancelsWhenConfirmFails() {
+        PlaceOrderResult placed = placeOrder();
+        paymentGateway.willTimeout();
+        paymentConfirm.confirm(confirmCommand(placed));
+        clock.advance(Duration.ofMinutes(1));
+        paymentGateway.inquiryWillFindApprovedAmount(placed.getPayAmount() - 1_000);
+
+        RecoveryOutcome outcome = recoveryService.recover(findSaga(placed).getId());
+
+        assertThat(outcome).isEqualTo(RecoveryOutcome.CANCELED);
+        assertThat(paymentGateway.cancelCount()).isEqualTo(1);
+        assertThat(findOrder(placed).getStatus()).isEqualTo(OrderStatus.FAILED);
+        assertThat(paymentStatus(placed)).isEqualTo(PaymentStatus.CANCELED);
+        assertThat(findStock().getReserved()).isEqualTo(0);
+        assertThat(findSaga(placed).getStatus()).isEqualTo(SagaStatus.COMPENSATED);
+    }
+
+    @Test
+    @DisplayName("PG 취소가 실패하면 주문과 자원을 그대로 두고, 다음 시도에서 취소되면 마무리한다")
+    void retriesCancelUntilItSucceeds() {
         PlaceOrderResult placed = placeOrder();
         paymentGateway.willApproveAmount(placed.getPayAmount() - 1_000);
+        paymentGateway.cancelWillFail("PG 점검 중");
 
-        assertErrorCode(() -> paymentConfirm.confirm(confirmCommand(placed)), ErrorCode.PAYMENT_AMOUNT_MISMATCH);
+        PaymentConfirmResult result = paymentConfirm.confirm(confirmCommand(placed));
 
-        assertThat(paymentGateway.callCount()).isEqualTo(1);
-        Order order = findOrder(placed);
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
-        assertThat(paymentRepository.findByOrderId(order.getId()).orElseThrow().getStatus())
-                .isEqualTo(PaymentStatus.READY);
+        assertThat(result.getStatus()).isEqualTo(PaymentConfirmStatus.PENDING);
+        assertThat(findOrder(placed).getStatus()).isEqualTo(OrderStatus.PENDING);
+        assertThat(paymentStatus(placed)).isEqualTo(PaymentStatus.READY);
+        assertThat(findRefund(placed).getStatus()).isEqualTo(RefundStatus.REQUESTED);
         assertThat(findStock().getReserved()).isEqualTo(2);
-        assertThat(findSaga(placed).getStatus()).isEqualTo(SagaStatus.STARTED);
+        OrderSaga saga = findSaga(placed);
+        assertThat(saga.getStatus()).isEqualTo(SagaStatus.COMPENSATING);
+        assertThat(saga.getAttemptCount()).isEqualTo(1);
+        assertThat(saga.getLastError()).isEqualTo("PG 점검 중");
+
+        clock.advance(Duration.ofMinutes(1));
+        paymentGateway.cancelWillSucceed();
+        RecoveryOutcome outcome = recoveryService.recover(saga.getId());
+
+        assertThat(outcome).isEqualTo(RecoveryOutcome.CANCELED);
+        assertThat(paymentGateway.cancelCount()).isEqualTo(2);
+        assertThat(paymentGateway.inquiryCount()).isEqualTo(0);
+        assertThat(findOrder(placed).getStatus()).isEqualTo(OrderStatus.FAILED);
+        assertThat(findRefund(placed).getStatus()).isEqualTo(RefundStatus.COMPLETED);
+        assertThat(findStock().getReserved()).isEqualTo(0);
+        assertThat(findSaga(placed).getStatus()).isEqualTo(SagaStatus.COMPENSATED);
     }
 
 }

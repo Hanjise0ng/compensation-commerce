@@ -11,24 +11,27 @@ import java.util.Optional;
 public class PaymentRecoveryService {
 
     private final OrderSagaService sagaService;
-    private final OrderConfirmService confirmService;
+    private final ApprovedPaymentFinisher paymentFinisher;
     private final OrderCompensationService compensationService;
+    private final PaymentCancelCompensator cancelCompensator;
     private final PaymentGateway paymentGateway;
 
     public PaymentRecoveryService(OrderSagaService sagaService,
-                                  OrderConfirmService confirmService,
+                                  ApprovedPaymentFinisher paymentFinisher,
                                   OrderCompensationService compensationService,
+                                  PaymentCancelCompensator cancelCompensator,
                                   PaymentGateway paymentGateway) {
         this.sagaService = sagaService;
-        this.confirmService = confirmService;
+        this.paymentFinisher = paymentFinisher;
         this.compensationService = compensationService;
+        this.cancelCompensator = cancelCompensator;
         this.paymentGateway = paymentGateway;
     }
 
     public RecoveryOutcome recover(Long sagaId) {
         Optional<RecoveryTarget> found = sagaService.loadTarget(sagaId);
         if (found.isEmpty()) {
-            return RecoveryOutcome.SKIPPED;
+            return cancelCompensator.run(sagaId);
         }
         RecoveryTarget target = found.get();
 
@@ -36,10 +39,7 @@ public class PaymentRecoveryService {
 
         try {
             return switch (result) {
-                case Approved approved -> {
-                    confirmService.confirm(target.getOrderId(), approved);
-                    yield RecoveryOutcome.CONFIRMED;
-                }
+                case Approved approved -> paymentFinisher.finish(target.getOrderId(), approved);
                 case Declined declined -> {
                     compensationService.compensate(target.getOrderId(), declined.getCode(), declined.getMessage());
                     yield RecoveryOutcome.COMPENSATED;

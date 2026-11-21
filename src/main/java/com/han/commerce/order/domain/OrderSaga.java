@@ -3,14 +3,8 @@ package com.han.commerce.order.domain;
 import com.han.commerce.common.domain.BaseEntity;
 import com.han.commerce.common.domain.DomainException;
 import com.han.commerce.common.domain.ErrorCode;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.Version;
+import jakarta.persistence.*;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -63,12 +57,20 @@ public class OrderSaga extends BaseEntity {
     }
 
     public void compensated(LocalDateTime now) {
-        requireStatus(SagaStatus.STARTED);
+        requireActive();
         finish(SagaStatus.COMPENSATED, now);
     }
 
-    public void postpone(String reason, LocalDateTime nextCheckAt) {
+    public void startCompensation(String reason, LocalDateTime now) {
         requireStatus(SagaStatus.STARTED);
+        this.status = SagaStatus.COMPENSATING;
+        this.attemptCount = 0;
+        this.lastError = truncate(reason);
+        this.nextCheckAt = now;
+    }
+
+    public void postpone(String reason, LocalDateTime nextCheckAt) {
+        requireActive();
         this.attemptCount++;
         this.lastError = truncate(reason);
         this.nextCheckAt = nextCheckAt;
@@ -76,6 +78,16 @@ public class OrderSaga extends BaseEntity {
 
     public boolean isInProgress() {
         return status == SagaStatus.STARTED;
+    }
+
+    public boolean isCompensating() {
+        return status == SagaStatus.COMPENSATING;
+    }
+
+    private void requireActive() {
+        if (status != SagaStatus.STARTED && status != SagaStatus.COMPENSATING) {
+            throw new DomainException(ErrorCode.INVALID_SAGA_STATE, "주문 " + orderId + ", 현재 " + status);
+        }
     }
 
     private void finish(SagaStatus finalStatus, LocalDateTime now) {

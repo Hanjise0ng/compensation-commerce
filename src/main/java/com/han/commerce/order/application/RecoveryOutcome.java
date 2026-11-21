@@ -4,5 +4,7 @@ public enum RecoveryOutcome {
     CONFIRMED,
     COMPENSATED,
     POSTPONED,
-    SKIPPED
+    SKIPPED,
+    CANCELED,
+    CANCEL_POSTPONED
 }
