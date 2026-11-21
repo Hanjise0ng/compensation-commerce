@@ -44,6 +44,11 @@ public class PaymentAttemptService {
                 .orElseThrow(() -> new DomainException(ErrorCode.PAYMENT_NOT_FOUND));
 
         order.startPayment(command.getMemberId(), Money.of(command.getAmount()));
+
+        if (sagaRepository.findByOrderId(order.getId()).isPresent()) {
+            throw new DomainException(ErrorCode.PAYMENT_IN_PROGRESS, order.getOrderNo());
+        }
+
         payment.attempt(command.getPaymentKey());
 
         LocalDateTime now = clockHolder.now();
