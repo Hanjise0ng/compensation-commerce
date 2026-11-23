@@ -6,4 +6,6 @@ public interface PaymentGateway {
 
     PaymentResult inquire(PaymentInquiryRequest request);
 
+    CancelResult cancel(PaymentCancelRequest request);
+
 }

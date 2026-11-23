@@ -183,7 +183,7 @@ CREATE TABLE IF NOT EXISTS order_saga (
     id             BIGINT       NOT NULL AUTO_INCREMENT,
     order_id       BIGINT       NOT NULL,
     payment_key    VARCHAR(200) NOT NULL COMMENT 'PG에 보낸 결제 키. 복구할 때 이 키로 조회한다',
-    status         VARCHAR(30)  NOT NULL COMMENT 'STARTED, COMPLETED, COMPENSATED',
+    status         VARCHAR(30)  NOT NULL COMMENT 'STARTED, COMPLETED, COMPENSATING, COMPENSATED, COMPENSATION_FAILED',
     attempt_count  INT          NOT NULL DEFAULT 0 COMMENT '복구를 시도했으나 결론을 못 낸 횟수',
     next_check_at  DATETIME(6)  NULL COMMENT '복구 워커가 이 시각 이후에 확인한다. 끝난 사가는 NULL',
     last_error     VARCHAR(255) NULL,
@@ -196,4 +196,21 @@ CREATE TABLE IF NOT EXISTS order_saga (
     UNIQUE KEY uk_order_saga_order (order_id),
     KEY idx_order_saga_next_check (next_check_at),
     CONSTRAINT fk_order_saga_order FOREIGN KEY (order_id) REFERENCES orders (id)
+) ENGINE = InnoDB;
+
+CREATE TABLE IF NOT EXISTS refund (
+    id            BIGINT       NOT NULL AUTO_INCREMENT,
+    order_id      BIGINT       NOT NULL,
+    payment_key   VARCHAR(200) NOT NULL COMMENT '취소할 PG 결제 키',
+    amount        BIGINT       NOT NULL COMMENT 'PG가 승인한 금액. 주문 금액과 다를 수 있다',
+    reason        VARCHAR(255) NOT NULL,
+    status        VARCHAR(30)  NOT NULL COMMENT 'REQUESTED, COMPLETED',
+    requested_at  DATETIME(6)  NOT NULL,
+    completed_at  DATETIME(6)  NULL,
+    created_at    DATETIME(6)  NOT NULL,
+    updated_at    DATETIME(6)  NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_refund_order (order_id),
+    CONSTRAINT fk_refund_order FOREIGN KEY (order_id) REFERENCES orders (id),
+    CONSTRAINT ck_refund_amount CHECK (amount >= 0)
 ) ENGINE = InnoDB;

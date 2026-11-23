@@ -28,6 +28,11 @@ public class StubPaymentGateway implements PaymentGateway {
         return new Approved(request.getPaymentKey(), request.getAmount(), "CARD", clockHolder.now());
     }
 
+    @Override
+    public CancelResult cancel(PaymentCancelRequest request) {
+        return new Canceled(clockHolder.now());
+    }
+
     private void sleep() {
         if (delayMs <= 0) {
             return;

@@ -1,6 +1,7 @@
 package com.han.commerce.support;
 
 import com.han.commerce.common.application.ClockHolder;
+import com.han.commerce.common.domain.Money;
 import com.han.commerce.payment.application.*;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
@@ -14,8 +15,11 @@ public class FakePaymentGateway implements PaymentGateway {
     private final ClockHolder clockHolder;
     private final AtomicInteger callCount = new AtomicInteger();
     private final AtomicInteger inquiryCount = new AtomicInteger();
+    private final AtomicInteger cancelCount = new AtomicInteger();
     private volatile PaymentResult scripted;
     private volatile PaymentResult inquiryScripted;
+    private volatile String cancelFailure;
+    private volatile Money lastCanceledAmount;
     private volatile long delayMs;
 
     public FakePaymentGateway(ClockHolder clockHolder) {
@@ -24,6 +28,10 @@ public class FakePaymentGateway implements PaymentGateway {
 
     public void willApprove() {
         this.scripted = null;
+    }
+
+    public void willApproveAmount(long amount) {
+        this.scripted = new Approved("pay-key-1", Money.of(amount), "CARD", clockHolder.now());
     }
 
     public void willDecline(String code, String message) {
@@ -38,12 +46,24 @@ public class FakePaymentGateway implements PaymentGateway {
         this.inquiryScripted = null;
     }
 
+    public void inquiryWillFindApprovedAmount(long amount) {
+        this.inquiryScripted = new Approved("pay-key-1", Money.of(amount), "CARD", clockHolder.now());
+    }
+
     public void inquiryWillFindNothing() {
         this.inquiryScripted = new Declined("PAYMENT_NOT_FOUND", "PG에 결제 기록이 없습니다.");
     }
 
     public void inquiryWillTimeout() {
         this.inquiryScripted = new Unknown("inquiry timeout");
+    }
+
+    public void cancelWillSucceed() {
+        this.cancelFailure = null;
+    }
+
+    public void cancelWillFail(String reason) {
+        this.cancelFailure = reason;
     }
 
     public void delay(long delayMs) {
@@ -53,9 +73,12 @@ public class FakePaymentGateway implements PaymentGateway {
     public void reset() {
         this.scripted = null;
         this.inquiryScripted = null;
+        this.cancelFailure = null;
+        this.lastCanceledAmount = null;
         this.delayMs = 0;
         this.callCount.set(0);
         this.inquiryCount.set(0);
+        this.cancelCount.set(0);
     }
 
     public int callCount() {
@@ -64,6 +87,14 @@ public class FakePaymentGateway implements PaymentGateway {
 
     public int inquiryCount() {
         return inquiryCount.get();
+    }
+
+    public int cancelCount() {
+        return cancelCount.get();
+    }
+
+    public Money lastCanceledAmount() {
+        return lastCanceledAmount;
     }
 
     @Override
@@ -83,6 +114,16 @@ public class FakePaymentGateway implements PaymentGateway {
             return inquiryScripted;
         }
         return new Approved(request.getPaymentKey(), request.getAmount(), "CARD", clockHolder.now());
+    }
+
+    @Override
+    public CancelResult cancel(PaymentCancelRequest request) {
+        cancelCount.incrementAndGet();
+        lastCanceledAmount = request.getAmount();
+        if (cancelFailure != null) {
+            return new CancelFailed(cancelFailure);
+        }
+        return new Canceled(clockHolder.now());
     }
 
     private void sleep() {
