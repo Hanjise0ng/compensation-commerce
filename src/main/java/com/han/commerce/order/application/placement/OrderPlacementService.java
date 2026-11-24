@@ -1,74 +1,57 @@
 package com.han.commerce.order.application.placement;
 
 import com.han.commerce.common.application.port.ClockHolder;
-import com.han.commerce.common.domain.error.DomainException;
-import com.han.commerce.common.domain.error.ErrorCode;
 import com.han.commerce.common.domain.Money;
-import com.han.commerce.coupon.domain.Coupon;
-import com.han.commerce.coupon.domain.CouponRepository;
-import com.han.commerce.coupon.domain.MemberCoupon;
-import com.han.commerce.coupon.domain.MemberCouponRepository;
-import com.han.commerce.order.application.placement.port.OrderNoGenerator;
+import com.han.commerce.coupon.application.CouponService;
 import com.han.commerce.order.application.placement.dto.PlaceOrderCommand;
 import com.han.commerce.order.application.placement.dto.PlaceOrderResult;
+import com.han.commerce.order.application.placement.port.OrderNoGenerator;
 import com.han.commerce.order.domain.Order;
 import com.han.commerce.order.domain.OrderItem;
 import com.han.commerce.order.domain.OrderRepository;
-import com.han.commerce.payment.domain.Payment;
-import com.han.commerce.payment.domain.PaymentRepository;
-import com.han.commerce.point.domain.PointHistoryRepository;
-import com.han.commerce.point.domain.PointWallet;
-import com.han.commerce.point.domain.PointWalletRepository;
-import com.han.commerce.product.domain.Product;
-import com.han.commerce.product.domain.ProductRepository;
-import com.han.commerce.stock.domain.Stock;
-import com.han.commerce.stock.domain.StockHistoryRepository;
-import com.han.commerce.stock.domain.StockRepository;
+import com.han.commerce.payment.application.PaymentService;
+import com.han.commerce.point.application.PointService;
+import com.han.commerce.product.application.ProductQueryService;
+import com.han.commerce.product.application.dto.ProductInfo;
+import com.han.commerce.stock.application.StockService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class OrderPlacementService {
 
-    private final ProductRepository productRepository;
-    private final StockRepository stockRepository;
-    private final StockHistoryRepository stockHistoryRepository;
-    private final CouponRepository couponRepository;
-    private final MemberCouponRepository memberCouponRepository;
-    private final PointWalletRepository pointWalletRepository;
-    private final PointHistoryRepository pointHistoryRepository;
+    private final ProductQueryService productQueryService;
+    private final StockService stockService;
+    private final CouponService couponService;
+    private final PointService pointService;
+    private final PaymentService paymentService;
     private final OrderRepository orderRepository;
-    private final PaymentRepository paymentRepository;
     private final OrderNoGenerator orderNoGenerator;
     private final ClockHolder clockHolder;
     private final Duration paymentWindow;
 
-    public OrderPlacementService(ProductRepository productRepository,
-                                 StockRepository stockRepository,
-                                 StockHistoryRepository stockHistoryRepository,
-                                 CouponRepository couponRepository,
-                                 MemberCouponRepository memberCouponRepository,
-                                 PointWalletRepository pointWalletRepository,
-                                 PointHistoryRepository pointHistoryRepository,
+    public OrderPlacementService(ProductQueryService productQueryService,
+                                 StockService stockService,
+                                 CouponService couponService,
+                                 PointService pointService,
+                                 PaymentService paymentService,
                                  OrderRepository orderRepository,
-                                 PaymentRepository paymentRepository,
                                  OrderNoGenerator orderNoGenerator,
                                  ClockHolder clockHolder,
                                  @Value("${commerce.order.payment-window:PT15M}") Duration paymentWindow) {
-        this.productRepository = productRepository;
-        this.stockRepository = stockRepository;
-        this.stockHistoryRepository = stockHistoryRepository;
-        this.couponRepository = couponRepository;
-        this.memberCouponRepository = memberCouponRepository;
-        this.pointWalletRepository = pointWalletRepository;
-        this.pointHistoryRepository = pointHistoryRepository;
+        this.productQueryService = productQueryService;
+        this.stockService = stockService;
+        this.couponService = couponService;
+        this.pointService = pointService;
+        this.paymentService = paymentService;
         this.orderRepository = orderRepository;
-        this.paymentRepository = paymentRepository;
         this.orderNoGenerator = orderNoGenerator;
         this.clockHolder = clockHolder;
         this.paymentWindow = paymentWindow;
@@ -79,7 +62,6 @@ public class OrderPlacementService {
         LocalDateTime now = clockHolder.now();
 
         List<OrderItem> items = createItems(command);
-        Map<Long, Stock> stocks = lockStocks(items);
         Money discount = useCoupon(command, OrderItem.totalOf(items), now);
 
         Order order = orderRepository.save(Order.place(
@@ -87,75 +69,32 @@ public class OrderPlacementService {
                 command.getMemberCouponId(), discount, Money.of(command.getPointAmount()),
                 now, paymentWindow));
 
-        reserveStocks(order, stocks);
-        usePoint(order);
-        paymentRepository.save(Payment.ready(order.getId(), order.getPayAmount()));
+        stockService.reserve(order.getId(), order.quantityByProductId());
+        if (order.usesPoint()) {
+            pointService.use(order.getMemberId(), order.getPointAmount(), order.getId());
+        }
+        paymentService.prepare(order.getId(), order.getPayAmount());
 
         return PlaceOrderResult.from(order);
     }
 
     private List<OrderItem> createItems(PlaceOrderCommand command) {
         List<Long> productIds = command.getItems().stream().map(PlaceOrderCommand.Item::getProductId).toList();
-        Map<Long, Product> products = new HashMap<>();
-        for (Product product : productRepository.findAllById(productIds)) {
-            products.put(product.getId(), product);
-        }
+        Map<Long, ProductInfo> products = productQueryService.getOnSaleProducts(productIds);
 
         List<OrderItem> items = new ArrayList<>();
         for (PlaceOrderCommand.Item item : command.getItems()) {
-            Product product = products.get(item.getProductId());
-            if (product == null) {
-                throw new DomainException(ErrorCode.PRODUCT_NOT_FOUND, "상품 " + item.getProductId());
-            }
-            product.validateOnSale();
+            ProductInfo product = products.get(item.getProductId());
             items.add(OrderItem.of(product.getId(), product.getName(), product.getPrice(), item.getQuantity()));
         }
         return items;
-    }
-
-    private Map<Long, Stock> lockStocks(List<OrderItem> items) {
-        TreeSet<Long> productIds = new TreeSet<>();
-        for (OrderItem item : items) {
-            productIds.add(item.getProductId());
-        }
-        Map<Long, Stock> stocks = new HashMap<>();
-        for (Stock stock : stockRepository.findAllByProductIdsForUpdate(productIds)) {
-            stocks.put(stock.getProductId(), stock);
-        }
-        if (stocks.size() != productIds.size()) {
-            throw new DomainException(ErrorCode.STOCK_NOT_FOUND);
-        }
-        return stocks;
     }
 
     private Money useCoupon(PlaceOrderCommand command, Money orderAmount, LocalDateTime now) {
         if (command.getMemberCouponId() == null) {
             return Money.ZERO;
         }
-        MemberCoupon memberCoupon = memberCouponRepository.findById(command.getMemberCouponId())
-                .orElseThrow(() -> new DomainException(ErrorCode.COUPON_NOT_FOUND));
-        Coupon coupon = couponRepository.findById(memberCoupon.getCouponId())
-                .orElseThrow(() -> new DomainException(ErrorCode.COUPON_NOT_FOUND));
-
-        Money discount = coupon.calculateDiscount(orderAmount, now);
-        memberCoupon.use(command.getMemberId(), now);
-        return discount;
-    }
-
-    private void reserveStocks(Order order, Map<Long, Stock> stocks) {
-        for (OrderItem item : order.getItems()) {
-            Stock stock = stocks.get(item.getProductId());
-            stockHistoryRepository.save(stock.reserve(item.getQuantity(), order.getId()));
-        }
-    }
-
-    private void usePoint(Order order) {
-        if (!order.usesPoint()) {
-            return;
-        }
-        PointWallet wallet = pointWalletRepository.findByMemberId(order.getMemberId())
-                .orElseThrow(() -> new DomainException(ErrorCode.POINT_WALLET_NOT_FOUND));
-        pointHistoryRepository.save(wallet.use(order.getPointAmount(), order.getId()));
+        return couponService.use(command.getMemberCouponId(), command.getMemberId(), orderAmount, now);
     }
 
 }
