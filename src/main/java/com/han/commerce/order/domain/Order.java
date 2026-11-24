@@ -1,8 +1,8 @@
 package com.han.commerce.order.domain;
 
-import com.han.commerce.common.domain.BaseEntity;
-import com.han.commerce.common.domain.DomainException;
-import com.han.commerce.common.domain.ErrorCode;
+import com.han.commerce.common.domain.entity.BaseEntity;
+import com.han.commerce.common.domain.error.DomainException;
+import com.han.commerce.common.domain.error.ErrorCode;
 import com.han.commerce.common.domain.Money;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.CascadeType;

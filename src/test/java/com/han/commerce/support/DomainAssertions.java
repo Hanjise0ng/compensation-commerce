@@ -1,7 +1,7 @@
 package com.han.commerce.support;
 
-import com.han.commerce.common.domain.DomainException;
-import com.han.commerce.common.domain.ErrorCode;
+import com.han.commerce.common.domain.error.DomainException;
+import com.han.commerce.common.domain.error.ErrorCode;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 
 import static org.assertj.core.api.Assertions.assertThat;

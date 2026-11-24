@@ -2,9 +2,10 @@ package com.han.commerce.order.presentation;
 
 import com.han.commerce.auth.AuthenticatedMember;
 import com.han.commerce.auth.LoginMember;
-import com.han.commerce.order.application.OrderPaymentSaga;
-import com.han.commerce.order.application.PaymentConfirmResult;
-import com.han.commerce.order.application.PaymentConfirmStatus;
+import com.han.commerce.order.application.checkout.OrderPaymentSaga;
+import com.han.commerce.order.application.checkout.dto.PaymentConfirmResult;
+import com.han.commerce.order.application.checkout.dto.PaymentConfirmStatus;
+import com.han.commerce.order.presentation.request.ConfirmPaymentRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

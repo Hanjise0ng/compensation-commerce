@@ -1,7 +1,7 @@
 package com.han.commerce.common.presentation;
 
-import com.han.commerce.common.domain.DomainException;
-import com.han.commerce.common.domain.ErrorType;
+import com.han.commerce.common.domain.error.DomainException;
+import com.han.commerce.common.domain.error.ErrorType;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
