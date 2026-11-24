@@ -1,13 +1,15 @@
 package com.han.commerce.order.domain;
 
-import com.han.commerce.common.domain.error.ErrorCode;
 import com.han.commerce.common.domain.Money;
+import com.han.commerce.common.domain.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static com.han.commerce.support.DomainAssertions.assertErrorCode;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -126,6 +128,21 @@ class OrderTest {
         order.startPayment(MEMBER_ID, Money.of(20_000));
 
         assertErrorCode(() -> order.expire(NOW.plusHours(1)), ErrorCode.ORDER_NOT_EXPIRED);
+    }
+
+    @Test
+    @DisplayName("상품별 주문 수량을 상품 ID 순서로 돌려준다")
+    void quantityByProductId() {
+        Order order = Order.place("ORD-1", "key-1", MEMBER_ID,
+                List.of(OrderItem.of(20L, "마우스", Money.of(5_000), 1),
+                        OrderItem.of(10L, "키보드", Money.of(10_000), 2)),
+                null, Money.ZERO, Money.ZERO, NOW, WINDOW);
+
+        Map<Long, Integer> quantities = order.quantityByProductId();
+
+        assertThat(new ArrayList<>(quantities.keySet())).containsExactly(10L, 20L);
+        assertThat(quantities.get(10L)).isEqualTo(2);
+        assertThat(quantities.get(20L)).isEqualTo(1);
     }
 
 }
