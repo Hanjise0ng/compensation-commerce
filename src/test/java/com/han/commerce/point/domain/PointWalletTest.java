@@ -1,6 +1,6 @@
 package com.han.commerce.point.domain;
 
-import com.han.commerce.common.domain.ErrorCode;
+import com.han.commerce.common.domain.error.ErrorCode;
 import com.han.commerce.common.domain.Money;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

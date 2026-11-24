@@ -1,6 +1,6 @@
 package com.han.commerce.support;
 
-import com.han.commerce.common.application.ClockHolder;
+import com.han.commerce.common.application.port.ClockHolder;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 

@@ -1,6 +1,6 @@
 package com.han.commerce.stock.domain;
 
-import com.han.commerce.common.domain.BaseCreatedEntity;
+import com.han.commerce.common.domain.entity.BaseCreatedEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;

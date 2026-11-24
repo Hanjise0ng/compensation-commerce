@@ -1,5 +1,7 @@
 package com.han.commerce.common.domain;
 
+import com.han.commerce.common.domain.error.DomainException;
+import com.han.commerce.common.domain.error.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 

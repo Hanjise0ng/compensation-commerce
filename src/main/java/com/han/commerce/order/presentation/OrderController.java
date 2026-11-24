@@ -2,10 +2,11 @@ package com.han.commerce.order.presentation;
 
 import com.han.commerce.auth.AuthenticatedMember;
 import com.han.commerce.auth.LoginMember;
-import com.han.commerce.order.application.OrderDetail;
-import com.han.commerce.order.application.OrderPlacementFacade;
-import com.han.commerce.order.application.OrderQueryService;
-import com.han.commerce.order.application.PlaceOrderResult;
+import com.han.commerce.order.application.query.dto.OrderDetail;
+import com.han.commerce.order.application.placement.OrderPlacementFacade;
+import com.han.commerce.order.application.query.OrderQueryService;
+import com.han.commerce.order.application.placement.dto.PlaceOrderResult;
+import com.han.commerce.order.presentation.request.PlaceOrderRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

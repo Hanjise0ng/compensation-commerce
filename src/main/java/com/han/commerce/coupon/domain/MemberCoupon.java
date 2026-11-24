@@ -1,8 +1,8 @@
 package com.han.commerce.coupon.domain;
 
-import com.han.commerce.common.domain.BaseEntity;
-import com.han.commerce.common.domain.DomainException;
-import com.han.commerce.common.domain.ErrorCode;
+import com.han.commerce.common.domain.entity.BaseEntity;
+import com.han.commerce.common.domain.error.DomainException;
+import com.han.commerce.common.domain.error.ErrorCode;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;

@@ -1,6 +1,6 @@
 package com.han.commerce.member.domain;
 
-import com.han.commerce.common.domain.BaseEntity;
+import com.han.commerce.common.domain.entity.BaseEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;

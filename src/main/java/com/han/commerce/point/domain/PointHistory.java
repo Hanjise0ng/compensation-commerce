@@ -1,6 +1,6 @@
 package com.han.commerce.point.domain;
 
-import com.han.commerce.common.domain.BaseCreatedEntity;
+import com.han.commerce.common.domain.entity.BaseCreatedEntity;
 import com.han.commerce.common.domain.Money;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;

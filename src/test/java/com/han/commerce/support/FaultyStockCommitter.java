@@ -1,6 +1,6 @@
 package com.han.commerce.support;
 
-import com.han.commerce.order.application.OrderStockCommitter;
+import com.han.commerce.order.application.checkout.OrderStockCommitter;
 import com.han.commerce.order.domain.Order;
 import com.han.commerce.stock.domain.StockHistoryRepository;
 import com.han.commerce.stock.domain.StockRepository;
