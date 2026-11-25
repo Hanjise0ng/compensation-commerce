@@ -6,10 +6,8 @@ import com.han.commerce.common.domain.error.ErrorCode;
 import com.han.commerce.order.domain.Order;
 import com.han.commerce.order.domain.OrderRepository;
 import com.han.commerce.order.domain.saga.OrderSagaRepository;
-import com.han.commerce.payment.domain.Payment;
-import com.han.commerce.payment.domain.PaymentRepository;
-import com.han.commerce.payment.domain.refund.Refund;
-import com.han.commerce.payment.domain.refund.RefundRepository;
+import com.han.commerce.payment.application.PaymentService;
+import com.han.commerce.payment.application.dto.RefundInfo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,22 +17,19 @@ import java.time.LocalDateTime;
 public class OrderCompensationService {
 
     private final OrderRepository orderRepository;
-    private final PaymentRepository paymentRepository;
-    private final RefundRepository refundRepository;
     private final OrderSagaRepository sagaRepository;
+    private final PaymentService paymentService;
     private final OrderResourceReleaser resourceReleaser;
     private final ClockHolder clockHolder;
 
     public OrderCompensationService(OrderRepository orderRepository,
-                                    PaymentRepository paymentRepository,
-                                    RefundRepository refundRepository,
                                     OrderSagaRepository sagaRepository,
+                                    PaymentService paymentService,
                                     OrderResourceReleaser resourceReleaser,
                                     ClockHolder clockHolder) {
         this.orderRepository = orderRepository;
-        this.paymentRepository = paymentRepository;
-        this.refundRepository = refundRepository;
         this.sagaRepository = sagaRepository;
+        this.paymentService = paymentService;
         this.resourceReleaser = resourceReleaser;
         this.clockHolder = clockHolder;
     }
@@ -44,13 +39,8 @@ public class OrderCompensationService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new DomainException(ErrorCode.ORDER_NOT_FOUND));
         order.fail(reason);
-
         resourceReleaser.release(order);
-
-        Payment payment = paymentRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new DomainException(ErrorCode.PAYMENT_NOT_FOUND));
-        payment.fail(failureCode, reason);
-
+        paymentService.fail(orderId, failureCode, reason);
         sagaRepository.findByOrderId(orderId).ifPresent(saga -> saga.compensated(clockHolder.now()));
     }
 
@@ -58,17 +48,10 @@ public class OrderCompensationService {
     public void compensateCanceled(Long orderId, LocalDateTime canceledAt) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new DomainException(ErrorCode.ORDER_NOT_FOUND));
-        Refund refund = refundRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new DomainException(ErrorCode.REFUND_NOT_FOUND));
+        RefundInfo refund = paymentService.getRefund(orderId);
         order.fail(refund.getReason());
-
         resourceReleaser.release(order);
-
-        Payment payment = paymentRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new DomainException(ErrorCode.PAYMENT_NOT_FOUND));
-        payment.cancel(canceledAt);
-        refund.complete(canceledAt);
-
+        paymentService.completeCancel(orderId, canceledAt);
         sagaRepository.findByOrderId(orderId).ifPresent(saga -> saga.compensated(clockHolder.now()));
     }
 
