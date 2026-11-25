@@ -58,7 +58,7 @@ class ConfirmFailureKindTest extends IntegrationTestSupport {
                 List.of(new PlaceOrderCommand.Item(product.getId(), 2)), null, 0));
         ConfirmPaymentCommand command = new ConfirmPaymentCommand(memberId, placed.getOrderNo(), "pay-key-1",
                 placed.getPayAmount());
-        stockCommitter.failNextCommit();
+        faultyStockService.failNextCommit();
 
         assertThatThrownBy(() -> paymentConfirm.confirm(command)).isInstanceOf(IllegalStateException.class);
 
