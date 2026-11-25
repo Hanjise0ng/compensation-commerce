@@ -25,14 +25,14 @@ public abstract class IntegrationTestSupport {
     protected FakePaymentGateway paymentGateway;
 
     @Autowired
-    protected FaultyStockCommitter stockCommitter;
+    protected FaultyStockService faultyStockService;
 
     @BeforeEach
     void resetState() {
         databaseCleaner.clean();
         clock.reset();
         paymentGateway.reset();
-        stockCommitter.reset();
+        faultyStockService.reset();
     }
 
 }

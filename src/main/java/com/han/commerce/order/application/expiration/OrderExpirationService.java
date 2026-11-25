@@ -6,8 +6,7 @@ import com.han.commerce.common.domain.error.ErrorCode;
 import com.han.commerce.order.application.compensation.OrderResourceReleaser;
 import com.han.commerce.order.domain.Order;
 import com.han.commerce.order.domain.OrderRepository;
-import com.han.commerce.payment.domain.Payment;
-import com.han.commerce.payment.domain.PaymentRepository;
+import com.han.commerce.payment.application.PaymentService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,16 +16,16 @@ import java.util.List;
 public class OrderExpirationService {
 
     private final OrderRepository orderRepository;
-    private final PaymentRepository paymentRepository;
+    private final PaymentService paymentService;
     private final OrderResourceReleaser resourceReleaser;
     private final ClockHolder clockHolder;
 
     public OrderExpirationService(OrderRepository orderRepository,
-                                  PaymentRepository paymentRepository,
+                                  PaymentService paymentService,
                                   OrderResourceReleaser resourceReleaser,
                                   ClockHolder clockHolder) {
         this.orderRepository = orderRepository;
-        this.paymentRepository = paymentRepository;
+        this.paymentService = paymentService;
         this.resourceReleaser = resourceReleaser;
         this.clockHolder = clockHolder;
     }
@@ -41,12 +40,8 @@ public class OrderExpirationService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new DomainException(ErrorCode.ORDER_NOT_FOUND));
         order.expire(clockHolder.now());
-
         resourceReleaser.release(order);
-
-        Payment payment = paymentRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new DomainException(ErrorCode.PAYMENT_NOT_FOUND));
-        payment.fail("ORDER_EXPIRED", "결제 기한 만료");
+        paymentService.fail(orderId, "ORDER_EXPIRED", "결제 기한 만료");
     }
 
 }

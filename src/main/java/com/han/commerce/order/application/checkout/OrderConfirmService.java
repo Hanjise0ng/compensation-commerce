@@ -6,9 +6,9 @@ import com.han.commerce.common.domain.error.ErrorCode;
 import com.han.commerce.order.domain.Order;
 import com.han.commerce.order.domain.OrderRepository;
 import com.han.commerce.order.domain.saga.OrderSagaRepository;
+import com.han.commerce.payment.application.PaymentService;
 import com.han.commerce.payment.application.port.result.Approved;
-import com.han.commerce.payment.domain.Payment;
-import com.han.commerce.payment.domain.PaymentRepository;
+import com.han.commerce.stock.application.StockService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,20 +18,20 @@ import java.time.LocalDateTime;
 public class OrderConfirmService {
 
     private final OrderRepository orderRepository;
-    private final PaymentRepository paymentRepository;
     private final OrderSagaRepository sagaRepository;
-    private final OrderStockCommitter stockCommitter;
+    private final PaymentService paymentService;
+    private final StockService stockService;
     private final ClockHolder clockHolder;
 
     public OrderConfirmService(OrderRepository orderRepository,
-                               PaymentRepository paymentRepository,
                                OrderSagaRepository sagaRepository,
-                               OrderStockCommitter stockCommitter,
+                               PaymentService paymentService,
+                               StockService stockService,
                                ClockHolder clockHolder) {
         this.orderRepository = orderRepository;
-        this.paymentRepository = paymentRepository;
         this.sagaRepository = sagaRepository;
-        this.stockCommitter = stockCommitter;
+        this.paymentService = paymentService;
+        this.stockService = stockService;
         this.clockHolder = clockHolder;
     }
 
@@ -39,14 +39,11 @@ public class OrderConfirmService {
     public void confirm(Long orderId, Approved approved) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new DomainException(ErrorCode.ORDER_NOT_FOUND));
-        Payment payment = paymentRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new DomainException(ErrorCode.PAYMENT_NOT_FOUND));
         LocalDateTime now = clockHolder.now();
 
-        payment.approve(approved.getMethod(), approved.getApprovedAt());
+        paymentService.approve(orderId, approved.getMethod(), approved.getApprovedAt());
         order.completePayment(approved.getApprovedAmount(), now);
-        stockCommitter.commit(order);
-
+        stockService.commit(orderId, order.quantityByProductId());
         sagaRepository.findByOrderId(orderId).ifPresent(saga -> saga.complete(now));
     }
 

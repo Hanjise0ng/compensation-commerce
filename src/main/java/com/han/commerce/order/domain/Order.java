@@ -1,29 +1,14 @@
 package com.han.commerce.order.domain;
 
+import com.han.commerce.common.domain.Money;
 import com.han.commerce.common.domain.entity.BaseEntity;
 import com.han.commerce.common.domain.error.DomainException;
 import com.han.commerce.common.domain.error.ErrorCode;
-import com.han.commerce.common.domain.Money;
-import jakarta.persistence.AttributeOverride;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Embedded;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
-import jakarta.persistence.Version;
+import jakarta.persistence.*;
+
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Entity
 @Table(name = "orders")
@@ -169,6 +154,14 @@ public class Order extends BaseEntity {
 
     public boolean usesPoint() {
         return !pointAmount.isZero();
+    }
+
+    public Map<Long, Integer> quantityByProductId() {
+        Map<Long, Integer> quantities = new TreeMap<>();
+        for (OrderItem item : items) {
+            quantities.put(item.getProductId(), item.getQuantity());
+        }
+        return quantities;
     }
 
     public Long getId() {
