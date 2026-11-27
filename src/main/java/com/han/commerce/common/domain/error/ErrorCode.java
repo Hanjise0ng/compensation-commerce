@@ -30,6 +30,7 @@ public enum ErrorCode {
     ORDER_ACCESS_DENIED(ErrorType.FORBIDDEN, "본인 주문이 아닙니다."),
     INVALID_ORDER_STATE(ErrorType.CONFLICT, "현재 주문 상태에서는 처리할 수 없습니다."),
     ORDER_NOT_EXPIRED(ErrorType.CONFLICT, "결제 기한이 지나지 않은 주문입니다."),
+    ORDER_NO_CONFLICT(ErrorType.CONFLICT, "주문을 만들지 못했습니다. 다시 시도해 주세요."),
 
     PAYMENT_NOT_FOUND(ErrorType.NOT_FOUND, "결제 정보를 찾을 수 없습니다."),
     PAYMENT_AMOUNT_MISMATCH(ErrorType.CONFLICT, "결제 금액이 주문 금액과 다릅니다."),

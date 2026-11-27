@@ -1,7 +1,7 @@
 package com.han.commerce.order.application.placement;
 
-import com.han.commerce.common.domain.error.ErrorCode;
 import com.han.commerce.common.domain.Money;
+import com.han.commerce.common.domain.error.ErrorCode;
 import com.han.commerce.coupon.domain.MemberCouponStatus;
 import com.han.commerce.coupon.infrastructure.persistence.MemberCouponJpaRepository;
 import com.han.commerce.order.application.placement.dto.PlaceOrderCommand;
@@ -110,6 +110,41 @@ class OrderPlacementTest extends IntegrationTestSupport {
         assertThat(second.getOrderNo()).isEqualTo(first.getOrderNo());
         assertThat(orderRepository.count()).isEqualTo(1L);
         assertThat(stockRepository.findByProductId(product.getId()).orElseThrow().getReserved()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("주문번호가 겹치면 새 번호로 다시 시도해 주문을 만든다")
+    void retriesWhenOrderNoCollides() {
+        Long memberId = fixtures.member();
+        Product product = fixtures.product("키보드", 10_000, 10);
+        PlaceOrderResult first = placementFacade.place(new PlaceOrderCommand(memberId, "key-1",
+                List.of(new PlaceOrderCommand.Item(product.getId(), 1)), null, 0));
+
+        orderNoGenerator.willGenerate(first.getOrderNo());
+        PlaceOrderResult second = placementFacade.place(new PlaceOrderCommand(memberId, "key-2",
+                List.of(new PlaceOrderCommand.Item(product.getId(), 1)), null, 0));
+
+        assertThat(second.getOrderNo()).isNotEqualTo(first.getOrderNo());
+        assertThat(orderRepository.count()).isEqualTo(2L);
+        assertThat(stockRepository.findByProductId(product.getId()).orElseThrow().getReserved()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("주문번호가 연달아 겹치면 주문을 만들지 않고 거절한다")
+    void rejectsWhenOrderNoKeepsColliding() {
+        Long memberId = fixtures.member();
+        Product product = fixtures.product("키보드", 10_000, 10);
+        PlaceOrderResult first = placementFacade.place(new PlaceOrderCommand(memberId, "key-1",
+                List.of(new PlaceOrderCommand.Item(product.getId(), 1)), null, 0));
+
+        orderNoGenerator.willGenerate(first.getOrderNo(), first.getOrderNo());
+
+        assertErrorCode(() -> placementFacade.place(new PlaceOrderCommand(memberId, "key-2",
+                        List.of(new PlaceOrderCommand.Item(product.getId(), 1)), null, 0)),
+                ErrorCode.ORDER_NO_CONFLICT);
+
+        assertThat(orderRepository.count()).isEqualTo(1L);
+        assertThat(stockRepository.findByProductId(product.getId()).orElseThrow().getReserved()).isEqualTo(1);
     }
 
 }

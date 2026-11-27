@@ -27,12 +27,16 @@ public abstract class IntegrationTestSupport {
     @Autowired
     protected FaultyStockService faultyStockService;
 
+    @Autowired
+    protected SequenceOrderNoGenerator orderNoGenerator;
+
     @BeforeEach
     void resetState() {
         databaseCleaner.clean();
         clock.reset();
         paymentGateway.reset();
         faultyStockService.reset();
+        orderNoGenerator.reset();
     }
 
 }
