@@ -30,11 +30,13 @@ public enum ErrorCode {
     ORDER_ACCESS_DENIED(ErrorType.FORBIDDEN, "본인 주문이 아닙니다."),
     INVALID_ORDER_STATE(ErrorType.CONFLICT, "현재 주문 상태에서는 처리할 수 없습니다."),
     ORDER_NOT_EXPIRED(ErrorType.CONFLICT, "결제 기한이 지나지 않은 주문입니다."),
+    ORDER_NO_CONFLICT(ErrorType.CONFLICT, "주문을 만들지 못했습니다. 다시 시도해 주세요."),
 
     PAYMENT_NOT_FOUND(ErrorType.NOT_FOUND, "결제 정보를 찾을 수 없습니다."),
     PAYMENT_AMOUNT_MISMATCH(ErrorType.CONFLICT, "결제 금액이 주문 금액과 다릅니다."),
     INVALID_PAYMENT_STATE(ErrorType.CONFLICT, "현재 결제 상태에서는 처리할 수 없습니다."),
     PAYMENT_IN_PROGRESS(ErrorType.CONFLICT, "결제가 진행 중입니다. 잠시 후 주문 상태를 확인해 주세요."),
+    PAYMENT_KEY_ALREADY_USED(ErrorType.CONFLICT, "이미 사용된 결제 키입니다."),
     REFUND_NOT_FOUND(ErrorType.NOT_FOUND, "환불 기록을 찾을 수 없습니다."),
     INVALID_REFUND_STATE(ErrorType.CONFLICT, "현재 환불 상태에서는 처리할 수 없습니다."),
 

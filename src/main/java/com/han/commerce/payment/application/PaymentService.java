@@ -31,6 +31,9 @@ public class PaymentService {
     }
 
     public void attempt(Long orderId, String paymentKey) {
+        if (paymentRepository.existsByPaymentKey(paymentKey)) {
+            throw new DomainException(ErrorCode.PAYMENT_KEY_ALREADY_USED);
+        }
         findPayment(orderId).attempt(paymentKey);
     }
 
