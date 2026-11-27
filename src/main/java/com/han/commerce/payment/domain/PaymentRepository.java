@@ -8,4 +8,6 @@ public interface PaymentRepository {
 
     Optional<Payment> findByOrderId(Long orderId);
 
+    boolean existsByPaymentKey(String paymentKey);
+
 }

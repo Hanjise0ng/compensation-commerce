@@ -5,6 +5,7 @@ import com.han.commerce.order.application.checkout.dto.ConfirmPaymentCommand;
 import com.han.commerce.order.application.placement.OrderPlacementFacade;
 import com.han.commerce.order.application.placement.dto.PlaceOrderCommand;
 import com.han.commerce.order.application.placement.dto.PlaceOrderResult;
+import com.han.commerce.order.domain.OrderStatus;
 import com.han.commerce.order.domain.saga.OrderSaga;
 import com.han.commerce.order.infrastructure.persistence.OrderJpaRepository;
 import com.han.commerce.order.infrastructure.persistence.OrderSagaJpaRepository;
@@ -65,6 +66,24 @@ class PaymentInProgressTest extends IntegrationTestSupport {
 
         assertThat(paymentGateway.callCount()).isEqualTo(1);
         assertThat(findSaga(placed).getPaymentKey()).isEqualTo("pay-key-1");
+    }
+
+    @Test
+    @DisplayName("다른 결제에서 이미 쓰인 결제 키로 승인을 요청하면 PG를 부르지 않고 거부한다")
+    void paymentKeyUsedByAnotherPaymentIsRejected() {
+        PlaceOrderResult first = placeOrder();
+        paymentConfirm.confirm(confirmCommand(first, "pay-key-1"));
+
+        PlaceOrderResult second = placeOrder();
+
+        assertErrorCode(() -> paymentConfirm.confirm(confirmCommand(second, "pay-key-1")),
+                ErrorCode.PAYMENT_KEY_ALREADY_USED);
+
+        assertThat(paymentGateway.callCount()).isEqualTo(1);
+        assertThat(orderRepository.findByOrderNo(second.getOrderNo()).orElseThrow().getStatus())
+                .isEqualTo(OrderStatus.PENDING);
+        assertThat(orderRepository.findByOrderNo(second.getOrderNo()).orElseThrow().getExpiresAt())
+                .isNotNull();
     }
 
 }
