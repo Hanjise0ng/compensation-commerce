@@ -6,6 +6,7 @@ import com.han.commerce.order.application.checkout.OrderPaymentSaga;
 import com.han.commerce.order.application.checkout.dto.PaymentConfirmResult;
 import com.han.commerce.order.application.checkout.dto.PaymentConfirmStatus;
 import com.han.commerce.order.presentation.request.ConfirmPaymentRequest;
+import com.han.commerce.order.presentation.response.PaymentConfirmResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,11 +26,11 @@ public class PaymentController {
     }
 
     @PostMapping("/confirm")
-    public ResponseEntity<PaymentConfirmResult> confirm(@LoginMember AuthenticatedMember member,
-                                                        @Valid @RequestBody ConfirmPaymentRequest request) {
+    public ResponseEntity<PaymentConfirmResponse> confirm(@LoginMember AuthenticatedMember member,
+                                                          @Valid @RequestBody ConfirmPaymentRequest request) {
         PaymentConfirmResult result = orderPaymentSaga.confirm(request.toCommand(member.getMemberId()));
         HttpStatus status = result.getStatus() == PaymentConfirmStatus.PENDING ? HttpStatus.ACCEPTED : HttpStatus.OK;
-        return ResponseEntity.status(status).body(result);
+        return ResponseEntity.status(status).body(PaymentConfirmResponse.from(result));
     }
 
 }

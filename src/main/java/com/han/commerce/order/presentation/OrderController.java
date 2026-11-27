@@ -2,11 +2,12 @@ package com.han.commerce.order.presentation;
 
 import com.han.commerce.auth.AuthenticatedMember;
 import com.han.commerce.auth.LoginMember;
-import com.han.commerce.order.application.query.dto.OrderDetail;
 import com.han.commerce.order.application.placement.OrderPlacementFacade;
-import com.han.commerce.order.application.query.OrderQueryService;
 import com.han.commerce.order.application.placement.dto.PlaceOrderResult;
+import com.han.commerce.order.application.query.OrderQueryService;
 import com.han.commerce.order.presentation.request.PlaceOrderRequest;
+import com.han.commerce.order.presentation.response.OrderDetailResponse;
+import com.han.commerce.order.presentation.response.PlaceOrderResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -31,16 +32,16 @@ public class OrderController {
     }
 
     @PostMapping
-    public ResponseEntity<PlaceOrderResult> place(@LoginMember AuthenticatedMember member,
-                                                  @RequestHeader("Idempotency-Key") String idempotencyKey,
-                                                  @Valid @RequestBody PlaceOrderRequest request) {
+    public ResponseEntity<PlaceOrderResponse> place(@LoginMember AuthenticatedMember member,
+                                                    @RequestHeader("Idempotency-Key") String idempotencyKey,
+                                                    @Valid @RequestBody PlaceOrderRequest request) {
         PlaceOrderResult result = placementFacade.place(request.toCommand(member.getMemberId(), idempotencyKey));
-        return ResponseEntity.status(HttpStatus.CREATED).body(result);
+        return ResponseEntity.status(HttpStatus.CREATED).body(PlaceOrderResponse.from(result));
     }
 
     @GetMapping("/{orderNo}")
-    public OrderDetail get(@LoginMember AuthenticatedMember member, @PathVariable String orderNo) {
-        return queryService.getOrder(member.getMemberId(), orderNo);
+    public OrderDetailResponse get(@LoginMember AuthenticatedMember member, @PathVariable String orderNo) {
+        return OrderDetailResponse.from(queryService.getOrder(member.getMemberId(), orderNo));
     }
 
 }
